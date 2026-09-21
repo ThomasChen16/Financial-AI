@@ -1,0 +1,20 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ---- Virtual environments (recreate from requirements.txt, never commit) ----
+.venv/
+venv/
+
+# ---- Project data (uploaded files + generated indexes stay local) ----
+data/indexes/
+data/uploads/
+
+# ---- Old scaffold, kept around only until you decide it's safe to delete ----
+_archive_scaffold/
+
+# ---- OS junk ----
+.DS_Store
+Thumbs.db

@@ -1,0 +1,5 @@
+{
+    // Point VS Code's Python language server (Pylance) at the project venv so
+    // imports resolve and the Problems tab stays clean.
+    "python.defaultInterpreterPath": "${workspaceFolder}/venv/Scripts/python.exe"
+}
