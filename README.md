@@ -222,12 +222,3 @@ Everything is hard-coded and easy to find:
 - **pip prints a weird "exit code 1" in PowerShell** → often just PowerShell wrapping
   stderr. Check `$LASTEXITCODE` and the actual pip message.
 - Read tracebacks **bottom-up** — the last line is the real error.
-
-## Status
-
-- ✅ **Steps 1–8 complete** — parser → chunker → embeddings → store → API → LLM →
-  end-to-end tests, all passing.
-- The original scaffold is kept under `_archive_scaffold/` (gitignored) until you're
-  confident it can be deleted.
-- **Next up:** a React frontend (upload form + ask box + answer display), which will
-  need CORS middleware added to `app/api.py`.
