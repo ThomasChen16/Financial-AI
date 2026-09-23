@@ -1,0 +1,88 @@
+/* Design tokens + base reset for the Financial AI app. */
+
+:root {
+  --bg-1: #f8fafc;
+  --bg-2: #e9edf3;
+  --surface: #ffffff;
+  --surface-2: #f4f7fb;
+  --border: #e2e8f0;
+
+  --text: #1e293b;
+  --text-muted: #64748b;
+
+  --accent: #10a97a;
+  --accent-strong: #0b7a55;
+  --accent-soft: rgba(16, 169, 122, 0.13);
+
+  --success: #0f9d6f;
+  --success-soft: rgba(15, 157, 111, 0.12);
+  --danger: #e04b4b;
+  --danger-soft: rgba(224, 75, 75, 0.12);
+  --warning: #d97706;
+  --warning-soft: rgba(217, 119, 6, 0.12);
+  --info: #64748b;
+  --info-soft: rgba(100, 116, 139, 0.12);
+
+  --radius: 0;
+  --shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06), 0 10px 24px rgba(15, 23, 42, 0.08);
+
+  --font: 'Inter', 'Segoe UI', system-ui, 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'IBM Plex Mono', 'Cascadia Mono', ui-monospace, Consolas, 'Courier New', monospace;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-1: #0d1220;
+    --bg-2: #111a2e;
+    --surface: #16203a;
+    --surface-2: #1e2a4a;
+    --border: #2a3855;
+
+    --text: #e6eaf2;
+    --text-muted: #94a3b8;
+
+    --accent: #34d399;
+    --accent-strong: #10b981;
+    --accent-soft: rgba(52, 211, 153, 0.14);
+
+    --success: #34d399;
+    --success-soft: rgba(52, 211, 153, 0.14);
+    --danger: #f87171;
+    --danger-soft: rgba(248, 113, 113, 0.14);
+    --warning: #fbbf24;
+    --warning-soft: rgba(251, 191, 36, 0.14);
+    --info: #94a3b8;
+    --info-soft: rgba(148, 163, 184, 0.14);
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px rgba(0, 0, 0, 0.35);
+
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: linear-gradient(160deg, var(--bg-1) 0%, var(--bg-2) 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  font: 16px/1.5 var(--font);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  min-height: 100vh;
+}

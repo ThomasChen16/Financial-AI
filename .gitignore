@@ -11,6 +11,7 @@ venv/
 # ---- Project data (uploaded files + generated indexes stay local) ----
 data/indexes/
 data/uploads/
+data/uploads.db
 
 # ---- Old scaffold, kept around only until you decide it's safe to delete ----
 _archive_scaffold/

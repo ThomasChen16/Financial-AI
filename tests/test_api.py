@@ -3,6 +3,10 @@ from fastapi.testclient import TestClient
 from app.api import app, VectorStore
 import pytest
 import socket
+import io
+from docx import Document
+import sqlite3
+from app import tracking
 
 # reusable function designed to set up baseline state environment before a test runs and cleanning it up afterwards
 # tmp_path creates a new temp folder on disk for each test and deletes it after
@@ -13,12 +17,16 @@ def isolated_client(monkeypatch, tmp_path):
     # Go to app.api find variable store and replace it with fresh_store
     monkeypatch.setattr("app.api.store", fresh_store)
     
-    # Redirect where /uploda writes file and saves the index
+    # Redirect where /upload writes file and saves the index
     monkeypatch.setattr("app.api.UPLOAD_DIR", str(tmp_path / "upload"))
     monkeypatch.setattr("app.api.INDEX_PATH", str(tmp_path / "indexes" / "default.index"))
     
+    # point the SQL tracking table at the temp directory
+    monkeypatch.setattr("app.tracking.DB_PATH", str(tmp_path / "uploads.db"))
+    
     # Use to call upload
     return TestClient(app)
+
 
 # Check whether the local Ollama service is available for tests
 def _ollama_reachable() -> bool:
@@ -157,3 +165,84 @@ def test_upload_rejects_txt(isolated_client):
     assert response.status_code == 400
     assert "Unsupported file type" in response.json()["detail"]
     
+def _make_docx(text: str) -> bytes:
+    doc = Document()
+    doc.add_paragraph(text)
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+def _upload_docx(client, filename: str, content: bytes):
+    return client.post(
+        "/upload",
+        files={
+            "file": (
+                filename,
+                content,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
+    )
+
+
+def test_first_upload_adds_file(isolated_client):
+    response = _upload_docx(
+        isolated_client,
+        "fresh.docx",
+        _make_docx("The company reported 120 million dollars in revenue."),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "added"
+    assert data["index_total"] == data["chunks"]
+
+
+def test_reupload_same_filename_replaces(isolated_client):
+    v1 = _make_docx("First version: revenue was 100 million dollars.")
+    v2 = _make_docx("Second version: revenue was 200 million dollars.")
+
+    first = _upload_docx(isolated_client, "report.docx", v1)
+    second = _upload_docx(isolated_client, "report.docx", v2)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    data = second.json()
+    assert data["status"] == "replaced"
+    assert data["index_total"] == data["chunks"]
+
+
+def test_search_after_replace_only_returns_new_content(isolated_client):
+    _upload_docx(
+        isolated_client,
+        "report.docx",
+        _make_docx("First version: revenue was 100 million dollars."),
+    )
+    _upload_docx(
+        isolated_client,
+        "report.docx",
+        _make_docx("Second version: revenue was 200 million dollars."),
+    )
+
+    response = isolated_client.post("/ask", json={"question": "What was the revenue?"})
+
+    assert response.status_code == 200
+    results = response.json()["results"]
+    assert results
+    assert all("200 million" in str(result) for result in results)
+    assert all("100 million" not in str(result) for result in results)
+
+
+def test_tracking_has_one_row_per_filename(isolated_client):
+    content = _make_docx("Revenue was 200 million dollars.")
+    for _ in range(3):
+        response = _upload_docx(isolated_client, "report.docx", content)
+        assert response.status_code == 200
+
+    conn = sqlite3.connect(tracking.DB_PATH)
+    rows = conn.execute(
+        "SELECT filename, file_type FROM uploads"
+    ).fetchall()
+    conn.close()
+
+    assert rows == [("report.docx", "docx")]

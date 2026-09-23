@@ -1,5 +1,4 @@
 import os
-
 from fastapi import FastAPI, File, HTTPException, UploadFile
 
 from app.chunker import chunk_text
@@ -7,11 +6,28 @@ from app.embeddings import embed_query, embed_texts
 from app.parser import extract_text_from_file
 from app.store import VectorStore
 from app.llm import generate_answer
+from app.tracking import find_upload, upsert_upload
 from pydantic import BaseModel
+
+
+from fastapi.middleware.cors import CORSMiddleware
 
 
 # Initialize the FastAPI app
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    # Vite dev server - accept localhost AND 127.0.0.1 so the app works no
+    # matter which spelling is used to open http://localhost:5173.
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 UPLOAD_DIR = "data/uploads"
 INDEX_PATH = "data/indexes/default.index"
@@ -40,15 +56,24 @@ def upload_file(file: UploadFile = File(...)):
 
     # 2. Sanitize the filename so uploads can"t escape data/uploads (path traversal)
     safe_name = os.path.basename((file.filename or "").replace("\\", "/"))
+    
+    # Normalize ".docx"/".pdf" -> "docx"/"pdf" so the key matches the value the
+    # tracking table already stores (".docx" would silently miss existing rows).
+    file_type = extension.lstrip(".")
+
+    # 3. Look up if the file been seen in upload.db before
+    will_replace = find_upload(safe_name, file_type) is not None
+    
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     upload_path = os.path.join(UPLOAD_DIR, safe_name)
 
+    
     try:
-        # 3. Stream the upload to disk
+        # 4. Stream the upload to disk
         with open(upload_path, "wb") as f:
             f.write(file.file.read())
 
-        # 4. Run the pipeline: parse --> chunk --> embed --> store
+        # 5. Run the pipeline: parse --> chunk --> embed --> store
         parsed_text = extract_text_from_file(upload_path)
         chunked_text = chunk_text(parsed_text["text"])
 
@@ -56,11 +81,21 @@ def upload_file(file: UploadFile = File(...)):
         texts = [c["text"] for c in chunked_text["chunks"]]
         embedded_text = embed_texts(texts)
 
-        store.add(texts, embedded_text)
+        # Swap old chunks for new ones if existing file
+        if will_replace:
+            store.remove_source(safe_name)
+
+        # Tag every chunk with its source file so a later re-upload of the same
+        # file can find and remove the old chunks (replace instead of append).
+        store.add(texts, embedded_text, source=safe_name)
         store.save(INDEX_PATH)
+
+        # Save into upload.db
+        upsert_upload(safe_name, file_type, chunked_text["total_chunks"])
 
         return {
             "filename": safe_name,
+            "status": "replaced" if will_replace else "added",
             "chunks": chunked_text["total_chunks"],
             "pages": parsed_text.get("pages"),
             "index_total": store.index.ntotal,
