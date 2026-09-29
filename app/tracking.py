@@ -80,7 +80,27 @@ def upsert_upload(filename: str, file_type: str, chunk_count: int) -> None:
         conn.commit()
     finally:
         conn.close()
-    
+
+# retrieve uploaded files in table from newest first
+def list_uploads() -> list[dict]:
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT id, filename, file_type, chunk_count, uploaded_at "
+            "FROM uploads ORDER BY uploaded_at DESC, id DESC"
+        ).fetchall()
+        return [
+            {
+                "id": row[0],
+                "filename": row[1],
+                "file_type": row[2],
+                "chunk_count": row[3],
+                "uploaded_at": row[4],
+            }
+            for row in rows
+        ]
+    finally:
+        conn.close()
     
 
 

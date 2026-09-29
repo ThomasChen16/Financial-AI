@@ -67,3 +67,12 @@ export async function health() {
         return networkError(error);
     }
 }
+// Return files the backend indexes, newest file, so the Uplaoded files panel show full history
+export async function listUploads() {
+    try {
+        const response = await fetch(`${API}/uploads`);
+        return await parseResponse(response);
+    } catch (error) {
+        return networkError(error);
+    }
+}

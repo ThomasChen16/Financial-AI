@@ -6,7 +6,7 @@ from app.embeddings import embed_query, embed_texts
 from app.parser import extract_text_from_file
 from app.store import VectorStore
 from app.llm import generate_answer
-from app.tracking import find_upload, upsert_upload
+from app.tracking import find_upload, upsert_upload, list_uploads
 from pydantic import BaseModel
 
 
@@ -157,3 +157,10 @@ def health_check():
     # Cheap "alive" check: proves the process responds and reports how many
     # chunks are indexed, without loading the model or doing a search.
     return {"status": "ok", "index_total": store.index.ntotal}
+
+
+# GET upload files info
+@app.get("/uploads")
+def uploaded_files():
+    # Return indexes files
+    return {"files": list_uploads()}
