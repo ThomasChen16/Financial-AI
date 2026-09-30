@@ -6,7 +6,7 @@ from app.embeddings import embed_query, embed_texts
 from app.parser import extract_text_from_file
 from app.store import VectorStore
 from app.llm import generate_answer
-from app.tracking import find_upload, upsert_upload, list_uploads
+from app.tracking import find_upload, upsert_upload, list_uploads, delete_upload
 from pydantic import BaseModel
 
 
@@ -164,3 +164,45 @@ def health_check():
 def uploaded_files():
     # Return indexes files
     return {"files": list_uploads()}
+
+# Remove one uploaded file everywhere: the chunks it owns in the FAISS index, its rows in the upload log, and the saved copy in data/uploads
+@app.delete("/uploads/{filename}")
+def delete_uploaded_file(filename: str, file_type: str | None = None):
+    
+    # 1. Sanitize the filename so uploads can"t escape data/uploads (path traversal)
+    safe_name = os.path.basename((filename or "").replace("\\", "/"))
+    
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="A filename is required.")
+    
+    # 2. Drop every chunk that belongs to that file and rebuild the index
+    removed_chunks = store.remove_source(safe_name)
+    
+    # 3. Forget the file in the upload log (one row per filename + file_type)
+    removed_rows = delete_upload(safe_name, file_type)
+    
+    # 4. Remove the stored copy on file directory, if still there
+    upload_path = os.path.join(UPLOAD_DIR, safe_name)
+    removed_file = os.path.exists(upload_path)
+    if removed_file:
+        os.remove(upload_path)
+        
+    # if file can't be located
+    if removed_chunks == 0 and removed_rows == 0 and not removed_file:
+        raise HTTPException(
+            status_code=404,
+            detail=f'No uploaded file named "{safe_name}" was found.',
+        )
+    
+    # 5. Persist the smaller index so the detection survives a restart too
+    store.save(INDEX_PATH)
+    
+    # return results of delete file with its metadata
+    return {
+        "filename": safe_name,
+        "status": "deleted",
+        "chunks_removed": removed_chunks,
+        "index_total": store.index.ntotal,
+    }
+    
+    

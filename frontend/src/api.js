@@ -76,3 +76,20 @@ export async function listUploads() {
         return networkError(error);
     }
 }
+
+// Delete one uploaded file. The backend removes its indexed chunks, its row in
+// the upload log, and the saved copy on disk, so the whole app forgets it.
+export async function deleteUpload(filename, fileType) {
+    // file_type narrows the request to a single upload when the same name was
+    // saved as both a PDF and a DOCX.
+    const query = fileType ? `?file_type=${encodeURIComponent(fileType)}` : "";
+    try {
+        const response = await fetch(
+            `${API}/uploads/${encodeURIComponent(filename)}${query}`,
+            { method: "DELETE" },
+        );
+        return await parseResponse(response);
+    } catch (error) {
+        return networkError(error);
+    }
+}

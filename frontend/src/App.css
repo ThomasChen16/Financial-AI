@@ -1,7 +1,7 @@
 /* Component styles for the Financial AI app. */
 
 .app {
-  max-width: 900px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 20px 14px 56px;
 }
@@ -129,7 +129,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
   margin-top: 18px;
 }
@@ -140,6 +140,8 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 20px 22px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .card-title h2 {
@@ -157,13 +159,36 @@
   margin-top: 18px;
 }
 
+/* Two-column main area: left content + right "Uploaded files" sidebar.
+   Keep this ABOVE the responsive media queries so their single-column
+   rules can override it at narrow widths. */
+
+.app-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 28px;
+  margin-top: 18px;
+  align-items: start;
+}
+
 /* ---------- Upload ---------- */
 
 .upload-form,
 .ask-form {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 14px;
+}
+
+.upload-form > *,
+.ask-form > * {
+  min-width: 0;
+}
+
+.btn {
+  flex: none;
+  white-space: nowrap;
 }
 
 .file-label {
@@ -491,6 +516,12 @@
   font-size: 12.5px;
 }
 
+@media (max-width: 920px) {
+  .app-main {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 720px) {
   .grid {
     grid-template-columns: 1fr;
@@ -507,3 +538,118 @@
     flex-direction: column;
   }
 }
+
+.app-content {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.app-content .grid,
+.app-content .stack {
+  margin-top: 0;   /* they used to supply their own 18px top margin */
+}
+
+.files-card {
+  min-width: 0;
+}
+
+.files-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.file-list {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-width: 0;
+}
+
+.file-type-badge {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.file-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto
+}
+
+.file-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.file-delete {
+  flex: none;
+  align-self: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.file-delete:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.file-delete:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+}
+
+.file-delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+

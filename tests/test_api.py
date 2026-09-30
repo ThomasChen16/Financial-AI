@@ -166,6 +166,7 @@ def test_upload_rejects_txt(isolated_client):
     assert "Unsupported file type" in response.json()["detail"]
     
 def _make_docx(text: str) -> bytes:
+    # Build an in-memory DOCX so tests do not need temporary source files.
     doc = Document()
     doc.add_paragraph(text)
     buf = io.BytesIO()
@@ -173,6 +174,7 @@ def _make_docx(text: str) -> bytes:
     return buf.getvalue()
 
 def _upload_docx(client, filename: str, content: bytes):
+    # Submit DOCX bytes using the same multipart format as a real client.
     return client.post(
         "/upload",
         files={
@@ -186,6 +188,7 @@ def _upload_docx(client, filename: str, content: bytes):
 
 
 def test_first_upload_adds_file(isolated_client):
+    # A new filename should create the first indexed document entry.
     response = _upload_docx(
         isolated_client,
         "fresh.docx",
@@ -199,6 +202,7 @@ def test_first_upload_adds_file(isolated_client):
 
 
 def test_reupload_same_filename_replaces(isolated_client):
+    # Uploading the same filename twice should replace, not duplicate, it.
     v1 = _make_docx("First version: revenue was 100 million dollars.")
     v2 = _make_docx("Second version: revenue was 200 million dollars.")
 
@@ -213,6 +217,7 @@ def test_reupload_same_filename_replaces(isolated_client):
 
 
 def test_search_after_replace_only_returns_new_content(isolated_client):
+    # Search results must not retain chunks from the replaced document.
     _upload_docx(
         isolated_client,
         "report.docx",
@@ -234,6 +239,7 @@ def test_search_after_replace_only_returns_new_content(isolated_client):
 
 
 def test_tracking_has_one_row_per_filename(isolated_client):
+    # Repeated uploads should leave one tracking row for each filename.
     content = _make_docx("Revenue was 200 million dollars.")
     for _ in range(3):
         response = _upload_docx(isolated_client, "report.docx", content)
@@ -246,3 +252,78 @@ def test_tracking_has_one_row_per_filename(isolated_client):
     conn.close()
 
     assert rows == [("report.docx", "docx")]
+
+# Deleting a file must remove it from every place the app shows it
+# Vector, index, upload log, and saved copy on disk
+def test_delete_upload_removes_files_everywhere(isolated_client, tmp_path):
+    _upload_docx(
+        isolated_client,
+        "report.docx",
+        _make_docx("Revenue was 200 million dollars."),
+    )
+    
+    response = isolated_client.delete("/uploads/report.docx")
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["filename"] == "report.docx"
+    assert data["status"] == "deleted"
+    assert data["chunks_removed"] == 1
+    assert data["index_total"] == 0
+    
+    # Gone from the "uploaded files" panel
+    assert isolated_client.get("/uploads").json() == {"files": []}
+    # Gone form index
+    assert isolated_client.post(
+        "/ask", json={"question": "What was the revenue?"}
+    ).status_code == 400
+    
+    # Gone from disk
+    assert not(tmp_path / "upload" / "report.docx").exists()
+
+# Deleting a filename that was never uploaded is a 404, not a crash
+def test_delete_missing_file_returns_404(isolated_client):
+    response = isolated_client.delete("/uploads/never-uploaded.docx")
+    
+    assert response.status_code == 404
+    assert "never-uploaded.docx" in response.json()["detail"]
+    
+# Deleting one file must leave other files listed and queryable
+def test_delete_keeps_other_files(isolated_client):
+    _upload_docx(
+        isolated_client, "keep.docx", _make_docx("Revenue was 200 million dollars.")
+    )
+    
+    _upload_docx(
+        isolated_client, "drop.docx", _make_docx("Costs were 40 million dollars.")
+    )
+    
+    response = isolated_client.delete("/uploads/drop.docx")
+    
+    assert response.status_code == 200
+    assert response.json()["chunks_removed"] == 1
+    
+    files = isolated_client.get("/uploads").json()["files"]
+    assert [f["filename"] for f in files] == ["keep.docx"]
+    
+    ask_response = isolated_client.post("/ask", json={"question": "What was the revenue?"})
+    assert ask_response.status_code == 200
+    results = ask_response.json()["results"]
+    assert results
+    assert all("200 million" in str(result) for result in results)
+    
+# A path-looking file must not escape data/uploades: sanitzer keeps only the base name (removing //), the same rule /upload applies
+def test_delete_cannot_escape_uploads_dir(isolated_client, tmp_path):
+    _upload_docx(
+        isolated_client,
+        "report.docx",
+        _make_docx("Renuve was 200 million dollars."),
+    )
+    
+    # Backslashes are normalized, so this still targets data/uploads/report.docx
+    response = isolated_client.delete("/uploads/..\\report.docx")
+    
+    assert response.status_code == 200
+    assert response.json()["filename"] == "report.docx"
+    assert not (tmp_path / "upload" / "report.docx").exists()
+    

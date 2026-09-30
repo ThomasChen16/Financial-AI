@@ -101,6 +101,29 @@ def list_uploads() -> list[dict]:
         ]
     finally:
         conn.close()
+
+# delete a file's row once the file itself is deleted
+def delete_upload(filename: str, file_type: str | None = None) -> int:
+    conn = get_connection()
+    
+    try:
+        # can delete with just filename if file_type is unknown
+        if file_type is None:
+            cursor = conn.execute(
+                "DELETE FROM uploads WHERE filename = ?",
+                (filename,),
+            )
+        else:
+            cursor = conn.execute(
+                "DELETE FROM uploads WHERE filename = ? AND file_type = ?",
+                (filename, file_type),
+            )
+        conn.commit()
+        
+        # rowcount tells caller how many rows were removed (0 = not found)
+        return cursor.rowcount
+    finally:
+        conn.close()
     
 
 
